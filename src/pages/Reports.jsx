@@ -53,7 +53,7 @@ export default function Reports({ profile }) {
 
     doc.setFontSize(18)
     doc.setTextColor(37, 99, 235)
-    doc.text('HisabBook', 20, 20)
+    doc.text('Laabh', 20, 20)
 
     doc.setFontSize(13)
     doc.setTextColor(30, 41, 59)

@@ -56,7 +56,7 @@ export default function Signup() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '24px' }}>
 
       <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-        <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#2563eb' }}>HisabBook</h1>
+        <h1 style={{ fontSize: '28px', fontWeight: '800', color: '#2563eb' }}>Laabh</h1>
         <p style={{ color: '#64748b', marginTop: '6px' }}>Create your free account</p>
       </div>
 
