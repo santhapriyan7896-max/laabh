@@ -83,7 +83,7 @@ export default function Reports({ profile }) {
     doc.setTextColor(148, 163, 184)
     doc.text(`Generated on ${format(new Date(), 'dd MMM yyyy, hh:mm a')}`, 20, 280)
 
-    doc.save(`HisabBook_${tab}_${tab === 'daily' ? selectedDate : selectedMonth}.pdf`)
+    doc.save(`Laabh_${tab}_${tab === 'daily' ? selectedDate : selectedMonth}.pdf`)
   }
 
   return (
