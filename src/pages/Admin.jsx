@@ -10,15 +10,15 @@ export default function Admin({ onExit }) {
   useEffect(() => { fetchShops() }, [])
 
   const fetchShops = async () => {
-    setLoading(true)
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('is_admin', false)
-      .order('created_at', { ascending: false })
-    setShops(data || [])
-    setLoading(false)
-  }
+  setLoading(true)
+  const { data } = await supabase
+    .from('profiles')
+    .select('*')
+    .neq('is_admin', true)
+    .order('created_at', { ascending: false })
+  setShops(data || [])
+  setLoading(false)
+}
 
   const updateStatus = async (id, status) => {
     await supabase.from('profiles').update({ subscription_status: status }).eq('id', id)
