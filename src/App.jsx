@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Signup from './pages/Signup'
 import Dashboard from './pages/Dashboard'
 import Admin from './pages/Admin'
+import Landing from './pages/Landing'
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 
@@ -37,10 +38,11 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={user ? <Dashboard /> : <Landing />} />
         <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
         <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/" />} />
         <Route path="/hbk-admin-9x7" element={<AdminRoute />} />
-        <Route path="/*" element={user ? <Dashboard /> : <Navigate to="/login" />} />
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
   )
