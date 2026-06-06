@@ -6,10 +6,12 @@ import Entries from './Entries'
 import Customers from './Customers'
 import Reports from './Reports'
 import Settings from './Settings'
+import Stock from './Stock'
 
 const tabs = [
   { id: 'home', label: 'Home', icon: '🏠' },
   { id: 'entries', label: 'Entries', icon: '📝' },
+  { id: 'stock', label: 'Stock', icon: '📦' },
   { id: 'customers', label: 'Customers', icon: '👥' },
   { id: 'reports', label: 'Reports', icon: '📊' },
   { id: 'settings', label: 'Settings', icon: '⚙️' },
@@ -33,6 +35,7 @@ export default function Dashboard() {
       case 'entries': return <Entries profile={profile} />
       case 'customers': return <Customers profile={profile} />
       case 'reports': return <Reports profile={profile} />
+      case 'stock': return <Stock profile={profile} />
       case 'settings': return <Settings profile={profile} onProfileUpdate={(updates) => setProfile(p => ({ ...p, ...updates }))} />
       default: return <Home profile={profile} />
     }

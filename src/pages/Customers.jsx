@@ -9,6 +9,7 @@ export default function Customers({ profile }) {
   const [showAddTx, setShowAddTx] = useState(null)
   const [editCustomer, setEditCustomer] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   const [custForm, setCustForm] = useState({ name: '', phone: '' })
   const [txForm, setTxForm] = useState({ amount: '', note: '' })
@@ -45,10 +46,7 @@ export default function Customers({ profile }) {
     setTransactions(data || [])
   }
 
-  const selectCustomer = (c) => {
-    setSelected(c)
-    fetchTransactions(c.id)
-  }
+  const selectCustomer = (c) => { setSelected(c); fetchTransactions(c.id) }
 
   const getBalance = (txs) =>
     txs.reduce((sum, t) => t.type === 'credit' ? sum + t.amount : sum - t.amount, 0)
@@ -132,7 +130,7 @@ export default function Customers({ profile }) {
     </div>
   ) : null
 
-  // Customer detail view
+  // Detail view
   if (selected) {
     const balance = getBalance(transactions)
     return (
@@ -160,7 +158,6 @@ export default function Customers({ profile }) {
               </p>
             </div>
           </div>
-
           <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
             {balance > 0 && (
               <button onClick={() => sendWhatsApp(selected, balance)} style={{
@@ -179,10 +176,8 @@ export default function Customers({ profile }) {
         </div>
 
         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-          <button className="btn-danger" onClick={() => setShowAddTx('credit')}
-            style={{ fontSize: '14px', padding: '12px' }}>+ Credit Given</button>
-          <button className="btn-success" onClick={() => setShowAddTx('payment')}
-            style={{ fontSize: '14px', padding: '12px' }}>+ Payment Received</button>
+          <button className="btn-danger" onClick={() => setShowAddTx('credit')} style={{ fontSize: '14px', padding: '12px' }}>+ Credit Given</button>
+          <button className="btn-success" onClick={() => setShowAddTx('payment')} style={{ fontSize: '14px', padding: '12px' }}>+ Payment Received</button>
         </div>
 
         {showAddTx && (
@@ -244,29 +239,37 @@ export default function Customers({ profile }) {
     )
   }
 
-  // Customer list view
+  // List view
+  const filteredCustomers = customers.filter(c =>
+    c.name.toLowerCase().includes(search.toLowerCase()) ||
+    c.phone.includes(search)
+  )
+
   return (
     <div className="page">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Customers</h2>
         <button onClick={() => { setEditCustomer(null); setCustForm({ name: '', phone: '' }); setShowAddCustomer(true) }}
-          style={{ width: 'auto', padding: '10px 16px', fontSize: '14px' }} className="btn-primary">
-          + Add
-        </button>
+          className="btn-primary" style={{ width: 'auto', padding: '10px 16px', fontSize: '14px' }}>+ Add</button>
       </div>
 
       {customerForm}
 
+      <div className="form-group">
+        <input type="text" placeholder="🔍 Search by name or phone..."
+          value={search} onChange={e => setSearch(e.target.value)} />
+      </div>
+
       {loading ? (
         <p style={{ color: '#64748b', textAlign: 'center' }}>Loading...</p>
-      ) : customers.length === 0 ? (
+      ) : filteredCustomers.length === 0 ? (
         <div className="card" style={{ textAlign: 'center', padding: '32px' }}>
           <p style={{ fontSize: '32px' }}>👥</p>
-          <p style={{ color: '#64748b', marginTop: '8px' }}>No customers yet</p>
+          <p style={{ color: '#64748b', marginTop: '8px' }}>{search ? 'No customers match your search' : 'No customers yet'}</p>
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {customers.map(c => (
+          {filteredCustomers.map(c => (
             <div key={c.id} className="card" onClick={() => selectCustomer(c)}
               style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
               <div>
@@ -275,10 +278,9 @@ export default function Customers({ profile }) {
               </div>
               <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <div>
-                  <p style={{
-                    fontWeight: '800', fontSize: '16px',
-                    color: c.balance > 0 ? '#dc2626' : c.balance < 0 ? '#16a34a' : '#64748b'
-                  }}>₹{Math.abs(c.balance).toLocaleString()}</p>
+                  <p style={{ fontWeight: '800', fontSize: '16px', color: c.balance > 0 ? '#dc2626' : c.balance < 0 ? '#16a34a' : '#64748b' }}>
+                    ₹{Math.abs(c.balance).toLocaleString()}
+                  </p>
                   <p style={{ fontSize: '11px', color: c.balance > 0 ? '#dc2626' : c.balance < 0 ? '#16a34a' : '#64748b' }}>
                     {c.balance > 0 ? 'owes you' : c.balance < 0 ? 'advance' : 'settled'}
                   </p>
