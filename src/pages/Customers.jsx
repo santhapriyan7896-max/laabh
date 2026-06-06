@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
+import { useVoice } from '../hooks/useVoice'
+import { parseCustomerTxFromVoice } from '../utils/parseVoice'
 
 export default function Customers({ profile }) {
   const [customers, setCustomers] = useState([])
@@ -10,19 +12,27 @@ export default function Customers({ profile }) {
   const [editCustomer, setEditCustomer] = useState(null)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [voiceResult, setVoiceResult] = useState(null)
+  const [voiceError, setVoiceError] = useState('')
+  const [voiceTarget, setVoiceTarget] = useState(null)
 
   const [custForm, setCustForm] = useState({ name: '', phone: '' })
   const [txForm, setTxForm] = useState({ amount: '', note: '' })
+
+  const { listening, startListening } = useVoice(
+    (transcript) => {
+      const parsed = parseCustomerTxFromVoice(transcript)
+      setVoiceResult(parsed)
+    },
+    (err) => setVoiceError(err)
+  )
 
   useEffect(() => { if (profile) fetchCustomers() }, [profile])
 
   const fetchCustomers = async () => {
     setLoading(true)
-    const { data: custs } = await supabase
-      .from('customers').select('*').eq('user_id', profile.id)
-
-    const { data: txs } = await supabase
-      .from('credit_transactions').select('*').eq('user_id', profile.id)
+    const { data: custs } = await supabase.from('customers').select('*').eq('user_id', profile.id)
+    const { data: txs } = await supabase.from('credit_transactions').select('*').eq('user_id', profile.id)
 
     const balanceMap = {}
     ;(txs || []).forEach(t => {
@@ -96,6 +106,28 @@ export default function Customers({ profile }) {
     fetchCustomers()
   }
 
+  const handleVoiceSave = async () => {
+    const target = voiceTarget || selected
+    if (voiceResult.amount) {
+      await supabase.from('credit_transactions').insert({
+        customer_id: target.id,
+        user_id: profile.id,
+        amount: voiceResult.amount,
+        type: voiceResult.type,
+        note: voiceResult.transcript,
+        date: new Date().toISOString().split('T')[0]
+      })
+      setVoiceResult(null)
+      setVoiceTarget(null)
+      if (selected) fetchTransactions(selected.id)
+      fetchCustomers()
+    } else {
+      setShowAddTx(voiceResult.type)
+      setVoiceResult(null)
+      setVoiceTarget(null)
+    }
+  }
+
   const sendWhatsApp = (customer, balance) => {
     const msg = `Hello ${customer.name}, your outstanding balance at ${profile.shop_name} is ₹${balance}. Please make the payment at your earliest convenience. Thank you!`
     window.open(`https://wa.me/91${customer.phone}?text=${encodeURIComponent(msg)}`, '_blank')
@@ -130,6 +162,48 @@ export default function Customers({ profile }) {
     </div>
   ) : null
 
+  const voiceModal = voiceResult ? (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 300 }}>
+      <div style={{ background: 'white', width: '100%', maxWidth: '480px', margin: '0 auto', borderRadius: '20px 20px 0 0', padding: '24px' }}>
+        <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '4px' }}>🎤 Voice Entry</h3>
+        <p style={{ fontSize: '13px', color: '#2563eb', fontWeight: '600', marginBottom: '4px' }}>
+          Customer: {(voiceTarget || selected)?.name}
+        </p>
+        <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '20px' }}>"{voiceResult.transcript}"</p>
+
+        <div className="card" style={{ marginBottom: '16px', borderLeft: `4px solid ${voiceResult.type === 'payment' ? '#16a34a' : '#dc2626'}` }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <span style={{ fontSize: '13px', color: '#64748b' }}>Type</span>
+            <span style={{ fontWeight: '700', color: voiceResult.type === 'payment' ? '#16a34a' : '#dc2626' }}>
+              {voiceResult.type === 'payment' ? 'Payment Received' : 'Credit Given'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: '13px', color: '#64748b' }}>Amount</span>
+            <span style={{ fontWeight: '800', fontSize: '18px' }}>
+              {voiceResult.amount ? `₹${voiceResult.amount}` : '—'}
+            </span>
+          </div>
+        </div>
+
+        {!voiceResult.amount && (
+          <p style={{ color: '#d97706', fontSize: '13px', marginBottom: '14px', background: '#fef3c7', padding: '10px', borderRadius: '8px' }}>
+            ⚠️ Could not detect amount. Tap "Edit & Save" to fill manually.
+          </p>
+        )}
+
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button className="btn-outline" style={{ width: 'auto', padding: '14px 20px' }}
+            onClick={() => { setVoiceResult(null); setVoiceTarget(null) }}>Cancel</button>
+          <button className={voiceResult.type === 'payment' ? 'btn-success' : 'btn-danger'}
+            onClick={handleVoiceSave}>
+            {voiceResult.amount ? '✓ Save' : 'Edit & Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null
+
   // Detail view
   if (selected) {
     const balance = getBalance(transactions)
@@ -141,6 +215,7 @@ export default function Customers({ profile }) {
         }}>← Back</button>
 
         {customerForm}
+        {voiceModal}
 
         <div className="card" style={{ marginBottom: '16px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -175,10 +250,32 @@ export default function Customers({ profile }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-          <button className="btn-danger" onClick={() => setShowAddTx('credit')} style={{ fontSize: '14px', padding: '12px' }}>+ Credit Given</button>
-          <button className="btn-success" onClick={() => setShowAddTx('payment')} style={{ fontSize: '14px', padding: '12px' }}>+ Payment Received</button>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '8px' }}>
+          <button className="btn-danger" onClick={() => setShowAddTx('credit')}
+            style={{ fontSize: '14px', padding: '12px' }}>+ Credit Given</button>
+          <button className="btn-success" onClick={() => setShowAddTx('payment')}
+            style={{ fontSize: '14px', padding: '12px' }}>+ Payment Received</button>
+          <button onClick={() => { setVoiceTarget(selected); startListening() }} style={{
+            width: 'auto', padding: '12px 16px', borderRadius: '10px',
+            fontSize: '20px', border: 'none', cursor: 'pointer',
+            background: listening ? '#dc2626' : '#f1f5f9',
+            transition: 'background 0.2s'
+          }}>🎤</button>
         </div>
+
+        {listening && (
+          <p style={{ color: '#2563eb', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+            🎙️ Listening... speak now
+          </p>
+        )}
+        {voiceError && (
+          <p style={{ color: '#dc2626', fontSize: '13px', marginBottom: '12px', background: '#fee2e2', padding: '10px', borderRadius: '8px' }}>
+            ⚠️ {voiceError}
+          </p>
+        )}
+        <p style={{ fontSize: '12px', color: '#94a3b8', marginBottom: '20px' }}>
+          🎤 Say: "500 கொடுத்தேன்" or "1000 payment"
+        </p>
 
         {showAddTx && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', zIndex: 200 }}>
@@ -254,11 +351,23 @@ export default function Customers({ profile }) {
       </div>
 
       {customerForm}
+      {voiceModal}
 
       <div className="form-group">
         <input type="text" placeholder="🔍 Search by name or phone..."
           value={search} onChange={e => setSearch(e.target.value)} />
       </div>
+
+      {listening && (
+        <p style={{ color: '#2563eb', fontSize: '13px', fontWeight: '600', marginBottom: '8px' }}>
+          🎙️ Listening for {voiceTarget?.name}...
+        </p>
+      )}
+      {voiceError && (
+        <p style={{ color: '#dc2626', fontSize: '13px', marginBottom: '12px', background: '#fee2e2', padding: '10px', borderRadius: '8px' }}>
+          ⚠️ {voiceError}
+        </p>
+      )}
 
       {loading ? (
         <p style={{ color: '#64748b', textAlign: 'center' }}>Loading...</p>
@@ -270,14 +379,16 @@ export default function Customers({ profile }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filteredCustomers.map(c => (
-            <div key={c.id} className="card" onClick={() => selectCustomer(c)}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
-              <div>
+            <div key={c.id} className="card"
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+
+              <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => selectCustomer(c)}>
                 <p style={{ fontWeight: '700', fontSize: '16px' }}>{c.name}</p>
                 <p style={{ fontSize: '13px', color: '#64748b' }}>📞 {c.phone}</p>
               </div>
-              <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ textAlign: 'right', cursor: 'pointer' }} onClick={() => selectCustomer(c)}>
                   <p style={{ fontWeight: '800', fontSize: '16px', color: c.balance > 0 ? '#dc2626' : c.balance < 0 ? '#16a34a' : '#64748b' }}>
                     ₹{Math.abs(c.balance).toLocaleString()}
                   </p>
@@ -285,7 +396,13 @@ export default function Customers({ profile }) {
                     {c.balance > 0 ? 'owes you' : c.balance < 0 ? 'advance' : 'settled'}
                   </p>
                 </div>
-                <span style={{ color: '#94a3b8', fontSize: '20px' }}>›</span>
+
+                <button onClick={(e) => { e.stopPropagation(); setVoiceTarget(c); startListening() }} style={{
+                  width: 'auto', padding: '8px 10px', borderRadius: '8px',
+                  fontSize: '16px', border: 'none', cursor: 'pointer',
+                  background: (listening && voiceTarget?.id === c.id) ? '#dc2626' : '#f1f5f9',
+                  transition: 'background 0.2s'
+                }}>🎤</button>
               </div>
             </div>
           ))}
